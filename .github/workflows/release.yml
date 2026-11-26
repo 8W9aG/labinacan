@@ -1,0 +1,40 @@
+name: Release
+
+# A tag v<version> builds the package and publishes it to PyPI. Publishing uses PyPI's
+# trusted publishing (OIDC), so no token is stored in the repository.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Check that the tag matches the version
+        run: |
+          version=$(uv run --no-project python -c "import re; print(re.search(r'__version__ = \"(.+)\"', open('labinacan/__init__.py').read())[1])")
+          test "v$version" = "$GITHUB_REF_NAME"
+      - name: Build
+        run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
