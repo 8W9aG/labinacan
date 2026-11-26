@@ -18,7 +18,8 @@ from pathlib import Path
 from labinacan.site.pii import redact_text
 from labinacan.site.research import _MARKDOWN, _plain
 
-LITERATURE = Path(__file__).resolve().parents[2] / "docs" / "literature"  # absent in an install
+# The project's reviews, in the folder that the build runs in, as build.py reads papers/.
+LITERATURE = Path("docs") / "literature"
 SECTION = "research/literature"
 MAP = "map.json"  # scripts/literature_map.py writes it (#3294)
 STATUSES = ("used", "planned", "not applicable")  # the index table's status column

@@ -17,7 +17,7 @@ from pathlib import Path
 from labinacan.site.pii import redact_text
 from labinacan.site.research import _MARKDOWN
 
-CHANGELOG = Path(__file__).resolve().parents[2] / "CHANGELOG.md"  # absent in an install
+CHANGELOG = Path("CHANGELOG.md")  # the project's, in the folder that the build runs in
 _HEADING = re.compile(r"^## \[(?P<name>[^\]]+)\](?: - (?P<date>\d{4}-\d{2}-\d{2}))?\s*$", re.M)
 
 

@@ -4,6 +4,16 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-26
+
+### Fixed
+
+- An installed labinacan reads the project's `docs/literature/` and `CHANGELOG.md` from the folder that the build runs in. Before, it looked beside its own files in `site-packages/`, so a build from PyPI wrote no literature pages, no literature feed and no Changelog page, and raised no error.
+
+### Added
+
+- A `py.typed` marker, so that a project's type checker reads labinacan's annotations.
+
 ## [0.1.0] - 2026-11-26
 
 ### Added
