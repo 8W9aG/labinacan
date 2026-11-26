@@ -4,6 +4,8 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-26
+
 ### Added
 
 - The first release of labinacan as a package of its own, from the `labinacan/` folder of [Open Interpretability](https://github.com/8W9aG/openinterpretability): the site build, the brand, the figure and motion pipeline, the social threads and the upload to R2.
