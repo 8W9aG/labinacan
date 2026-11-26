@@ -26,6 +26,8 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
+      - name: No words of another project (scripts/check_leftovers.py)
+        run: uv run python scripts/check_leftovers.py
       - name: Test
         run: uv run pytest -q
 

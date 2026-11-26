@@ -4,6 +4,10 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+### Added
+
+- CI checks that no word of another project is left in the package (`scripts/check_leftovers.py`, with the template's list of words). The baseline is empty.
+
 ## [0.1.1] - 2026-11-26
 
 ### Fixed

@@ -1,0 +1,2 @@
+# The leftover words that each template file may still hold (scripts/check_leftovers.py, #6631).
+# <hits> <path>. Lower a line when a file loses words. The template is cut when this list is empty.
