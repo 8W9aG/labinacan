@@ -4,6 +4,12 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-27
+
+### Added
+
+- `labinacan.site.build.build` and `main` take `sections`: the project's own sections, such as the pages of its units. Each one takes the renderer and runs after the project's own pages. A project calls `main(sections=...)` from its own module, and points `BUILD_COMMAND` in its Makefile at that module.
+
 ## [0.1.5] - 2026-11-27
 
 ### Added

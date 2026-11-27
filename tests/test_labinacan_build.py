@@ -139,17 +139,25 @@ def test_the_command_line_passes_its_defaults_and_only_the_folders_that_exist(pr
     )
     monkeypatch.chdir(project)
     site_build.main([])
-    assert calls[-1] == (site_build.Path("dist"), site_build.Path("templates"), None, None, False)
+    assert calls[-1] == (
+        site_build.Path("dist"),
+        site_build.Path("templates"),
+        None,
+        None,
+        False,
+        (),
+    )
     (project / "papers").mkdir()
     (project / "posts").mkdir()
     site_build.main(["--pdfs", "--templates", "t"])
-    out, templates, papers, posts, pdfs = calls[-1]
+    out, templates, papers, posts, pdfs, sections = calls[-1]
     assert (templates, papers, posts, pdfs) == (
         site_build.Path("t"),
         site_build.Path("papers"),
         site_build.Path("posts"),
         True,
     )
+    assert sections == ()  # a project with no sections of its own
     assert all(isinstance(p, site_build.Path) for p in (out, templates, papers, posts))
 
 
@@ -183,3 +191,24 @@ def test_the_pages_name_home_and_the_projects_version(project, monkeypatch):
     site_build.build(out)
     assert ">Home</a>" in (out / "research" / "index.html").read_text()
     assert "A Project 1.2.3" in (out / "index.html").read_text()
+
+
+def test_a_projects_own_sections_run_after_its_pages_and_write_into_the_site(project):
+    order = []
+
+    def units(render):
+        order.append("units")
+        render("units/index.html", "redirect.html", target="../index.html")
+
+    report = site_build.build(project / "dist", sections=(units,))
+    assert order == ["units"] and (project / "dist" / "units" / "index.html").exists()
+    assert project / "dist" / "units" / "index.html" in report.pages
+
+
+def test_the_command_line_passes_a_projects_sections_to_the_build(project, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(site_build, "build", lambda *a: seen.update(sections=a[-1]) or
+                        site_build.SiteReport(project))  # fmt: skip
+    marker = (lambda render: None,)
+    site_build.main(["--output-dir", str(project / "dist")], sections=marker)
+    assert seen["sections"] is marker

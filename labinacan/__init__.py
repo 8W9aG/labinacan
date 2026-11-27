@@ -6,4 +6,4 @@ come from ``[tool.labinacan]`` in the project's ``pyproject.toml`` (``labinacan.
 The package imports nothing from the project that uses it.
 """
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
