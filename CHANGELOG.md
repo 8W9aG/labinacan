@@ -4,6 +4,12 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-27
+
+### Fixed
+
+- Maths refuses a formula whose MathML holds markup other than MathML's own elements and attributes. The build stops with a `MathsError` that names the formula.
+
 ## [0.1.2] - 2026-11-27
 
 ### Fixed
