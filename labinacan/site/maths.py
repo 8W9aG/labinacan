@@ -14,6 +14,88 @@ from markdown_it import MarkdownIt
 
 UNKNOWN = re.compile(r">(\\[A-Za-z]+)<")  # a command left as text in the MathML
 
+# The elements and attributes that latex2mathml writes. Its output may hold no other markup.
+MATHML_TAGS = frozenset(
+    (
+        "math",
+        "mrow",
+        "mi",
+        "mn",
+        "mo",
+        "mtext",
+        "mspace",
+        "ms",
+        "msup",
+        "msub",
+        "msubsup",
+        "mfrac",
+        "msqrt",
+        "mroot",
+        "mstyle",
+        "merror",
+        "mpadded",
+        "mphantom",
+        "mfenced",
+        "menclose",
+        "munder",
+        "mover",
+        "munderover",
+        "mmultiscripts",
+        "mprescripts",
+        "none",
+        "mtable",
+        "mtr",
+        "mtd",
+        "mlabeledtr",
+        "maligngroup",
+        "malignmark",
+        "semantics",
+        "annotation",
+    )
+)
+MATHML_ATTRS = frozenset(
+    (
+        "xmlns",
+        "display",
+        "mathvariant",
+        "stretchy",
+        "fence",
+        "separator",
+        "separators",
+        "form",
+        "lspace",
+        "rspace",
+        "width",
+        "height",
+        "depth",
+        "columnalign",
+        "columnlines",
+        "columnspacing",
+        "rowalign",
+        "rowlines",
+        "rowspacing",
+        "frame",
+        "linethickness",
+        "accent",
+        "accentunder",
+        "movablelimits",
+        "symmetric",
+        "largeop",
+        "minsize",
+        "maxsize",
+        "notation",
+        "open",
+        "close",
+        "displaystyle",
+        "scriptlevel",
+        "encoding",
+        "align",
+    )
+)
+# A "<" that starts markup: a tag, an end tag, a comment or a declaration.
+MARKUP = re.compile(r"<\s*(/?)\s*([^\s/>&]+)([^>]*)>|<[!?]")
+ATTR = re.compile(r"([^\s=/]+)\s*=")
+
 
 class MathsError(ValueError):
     """A formula that ``latex2mathml`` can't read."""
@@ -31,7 +113,30 @@ def to_mathml(latex: str, display: bool) -> str:
         raise MathsError(f"can't typeset ${latex}$: {str(exc) or type(exc).__name__}") from exc
     if UNKNOWN.search(mathml):  # latex2mathml writes a command it doesn't know as text
         raise MathsError(f"can't typeset ${latex}$: {UNKNOWN.search(mathml).group(1)} is unknown")
+    _only_mathml(latex, mathml)
     return mathml
+
+
+def _only_mathml(latex: str, mathml: str) -> None:
+    """Refuse MathML that holds markup other than MathML's own elements and attributes.
+
+    latex2mathml writes the text of ``\\text{...}`` as it is, so text that looks like HTML
+    would reach the page as markup. A ``<`` that starts no tag, as in ``\\text{a < b}``,
+    stays text.
+
+    Args:
+        latex: The formula, for the error message.
+        mathml: Its MathML.
+
+    Raises:
+        MathsError: The MathML holds another element, an attribute that MathML doesn't use
+            here, a comment or a declaration.
+    """
+    for found in MARKUP.finditer(mathml):
+        name = (found.group(2) or "").lower()
+        attrs = {a.lower() for a in ATTR.findall(found.group(3) or "")}
+        if name not in MATHML_TAGS or not attrs <= MATHML_ATTRS:
+            raise MathsError(f"can't typeset ${latex}$: it holds markup that is not MathML")
 
 
 def _depth(latex: str) -> int:
