@@ -21,7 +21,7 @@ from labinacan.site.research import _MARKDOWN, _plain
 # The project's reviews, in the folder that the build runs in, as build.py reads papers/.
 LITERATURE = Path("docs") / "literature"
 SECTION = "research/literature"
-MAP = "map.json"  # scripts/literature_map.py writes it (#3294)
+MAP = "map.json"  # labinacan.literature_map writes it
 STATUSES = ("used", "planned", "not applicable")  # the index table's status column
 # A row of the index: "| [Title](name.md) (Authors, year) | status | why |".
 _ROW = re.compile(r"^\| \[[^\]]*\]\(([\w-]+)\.md\)[^|]*\| ([a-z ]+) \| (.+?) \|\s*$", re.M)

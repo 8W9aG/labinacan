@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 _PATHS: list[Path] = [Path("pyproject.toml")]
+# The label of the literature issues when [tool.labinacan] names none.
+LITERATURE_LABEL = "area: literature"
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,10 @@ class ProjectConfig:
     # Each paper's metadata file: its authors, status, frozen hash and alphaXiv URL. A
     # project with no citation file per paper names "paper.yml".
     paper_meta: str = "CITATION.cff"
+    # The GitHub repository, as "owner/name", whose open issues with literature_label are
+    # the literature map's queued papers. "" gives a map with no queue.
+    literature_repo: str = ""
+    literature_label: str = LITERATURE_LABEL
 
     @property
     def repo(self) -> str:
@@ -100,7 +106,23 @@ class ProjectConfig:
             >>> config().repo == config().repo_url.removeprefix("https://github.com/")
             True
         """
-        return self.repo_url.removeprefix("https://github.com/").strip("/")
+        return _slug(self.repo_url)
+
+
+def _slug(url: str) -> str:
+    """The ``owner/name`` of a GitHub repository's URL.
+
+    Args:
+        url: The repository's URL.
+
+    Returns:
+        The slug.
+
+    Examples:
+        >>> _slug("https://github.com/someone/a-project/")
+        'someone/a-project'
+    """
+    return url.removeprefix("https://github.com/").strip("/")
 
 
 def use(*paths: Path) -> None:
@@ -174,6 +196,9 @@ def config() -> ProjectConfig:
                 hf_dataset=own["hf_dataset"],
                 brand=brand_of(own.get("brand")),
                 paper_meta=own.get("paper_meta", "CITATION.cff"),
+                # The project's own repository, unless the table names another or "".
+                literature_repo=own.get("literature_repo", _slug(urls["Repository"])),
+                literature_label=own.get("literature_label", LITERATURE_LABEL),
             )
     raise LookupError(f"no [tool.labinacan] table in {', '.join(map(str, _PATHS))}")
 

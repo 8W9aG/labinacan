@@ -12,10 +12,32 @@ def test_site_commands_give_deploy_the_projects_site_url():
     def url():
         return "https://x.org/"
 
-    deploy, social = lab.site_commands("LAB_URL", url)
+    deploy, social, literature_map = lab.site_commands("LAB_URL", url)
     option = next(p for p in deploy.params if p.name == "site_url")
     assert (option.envvar, option.default) == ("LAB_URL", url)
     assert social is lab.social_group
+    assert literature_map is lab.literature_map_command
+
+
+def test_literature_map_runs_the_generator(monkeypatch):
+    from labinacan import literature_map
+
+    ran = []
+    monkeypatch.setattr(literature_map, "main", lambda: ran.append(True))
+    result = CliRunner().invoke(lab.literature_map_command, [])
+    assert result.exit_code == 0 and ran == [True]
+
+
+def test_literature_map_names_the_extra_when_a_library_is_missing(monkeypatch):
+    from labinacan import literature_map
+
+    def main():
+        raise ModuleNotFoundError("No module named 'umap'")
+
+    monkeypatch.setattr(literature_map, "main", main)
+    result = CliRunner().invoke(lab.literature_map_command, [])
+    assert result.exit_code == 1
+    assert "No module named 'umap'" in result.output and "labinacan[map]" in result.output
 
 
 def _deploy(monkeypatch, tmp_path, env, urls, rclone=None, extra=()):

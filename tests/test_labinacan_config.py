@@ -58,7 +58,7 @@ def test_the_config_reads_both_tables_of_the_first_path_that_has_them(tmp_path, 
         description="research on something.", site_url="https://example.org/",
         repo_url="https://github.com/someone/a-project", x_url="https://x.com/aproject/",
         contact_email="team@example.org", linear_team="APR", maintainer="someone",
-        hf_dataset="someone/a-project-inputs",
+        hf_dataset="someone/a-project-inputs", literature_repo="someone/a-project",
         brand=cfg.Brand(folder="brand", tile="#000000",
                         ink={"light": "#111111", "dark": "#EEEEEE"}, colours={"red": "#FF0000"},
                         cells=((0, 0, 1.0, "red"), (1, 0, 0.0, ""))),
@@ -125,3 +125,21 @@ def test_a_project_with_no_x_account_has_no_handle(tmp_path, restore):
 def test_the_handle_is_the_urls_last_part_whatever_its_letters():
     assert cfg.x_handle("https://x.com/labX/") == "@labX"  # a trailing X stays
     assert cfg.x_handle("https://x.com/a/b") == "@b"
+
+
+def test_a_project_can_name_the_repo_and_label_of_its_literature_queue(tmp_path, restore):
+    (tmp_path / "pyproject.toml").write_text(
+        PYPROJECT.replace("[tool.labinacan]\n", '[tool.labinacan]\nliterature_repo = "o/queue"\n'
+                          'literature_label = "papers"\n')
+    )  # fmt: skip
+    cfg.use(tmp_path / "pyproject.toml")
+    assert (cfg.config().literature_repo, cfg.config().literature_label) == ("o/queue", "papers")
+
+
+def test_an_empty_literature_repo_turns_the_queue_off(tmp_path, restore):
+    (tmp_path / "pyproject.toml").write_text(
+        PYPROJECT.replace("[tool.labinacan]\n", '[tool.labinacan]\nliterature_repo = ""\n')
+    )
+    cfg.use(tmp_path / "pyproject.toml")
+    assert cfg.config().literature_repo == ""
+    assert cfg.config().literature_label == cfg.LITERATURE_LABEL

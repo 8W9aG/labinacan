@@ -18,6 +18,8 @@ A project keeps its own research code beside the package, and sets its values in
 pip install labinacan
 # With the upload to R2, and the scan of published text for personal data:
 pip install "labinacan[r2,pii]"
+# With the layout of the literature map (python -m labinacan.literature_map):
+pip install "labinacan[map]"
 ```
 
 ## Start a project
@@ -43,6 +45,8 @@ hf_dataset = "someone/a-project-inputs"
 ```
 
 An optional `paper_meta` names each paper's metadata file, which holds its authors and its alphaXiv URL. The default is `"CITATION.cff"`. A project with no citation file per paper gives `"paper.yml"`.
+
+The literature map shows the open issues of `literature_repo` with `literature_label` as queued papers. The defaults are the repository of `[project.urls]` and `"area: literature"`. `literature_repo = ""` gives a map with no queue.
 
 `labinacan.config` reads these values. `tests/example/pyproject.toml` is a full example, with a brand.
 

@@ -29,6 +29,8 @@ dependencies = [
 r2 = ["boto3>=1.34.0"]
 # The scan of published text for personal data (labinacan.sensitive).
 pii = ["presidio-analyzer>=2.2"]
+# The layout of the literature map, docs/literature/map.json (labinacan.literature_map).
+map = ["sentence-transformers>=5.0", "umap-learn>=0.5.7", "leidenalg>=0.10.2", "igraph>=0.11"]
 
 [project.urls]
 Homepage = "https://github.com/8W9aG/labinacan/"
