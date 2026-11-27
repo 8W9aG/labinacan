@@ -13,6 +13,7 @@ at the same path. A project with no folder still builds, from the defaults only.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from labinacan.config import config, project_links
 from labinacan.site.brand import write_brand
 from labinacan.site.feeds import write_site_files
 from labinacan.site.render import Renderer, number_filters
-from labinacan.site.sections import render_sections
+from labinacan.site.sections import Section, render_sections
 
 DEFAULT_PAGES = ("index.html",)  # the pages that labinacan writes when a project has none
 
@@ -98,6 +99,7 @@ def build(
     papers_dir: Path | None = None,
     posts_dir: Path | None = None,
     pdfs: bool = False,
+    sections: Sequence[Section] = (),
 ) -> SiteReport:
     """Write the site into ``output_dir``.
 
@@ -107,6 +109,8 @@ def build(
         papers_dir: The papers, or None for an empty Research section.
         posts_dir: The posts, or None for an empty Posts section.
         pdfs: Print each paper's PDF, which needs headless Chrome.
+        sections: The project's own sections, such as its units' pages. Each one takes the
+            renderer, and runs after the project's own pages, in order.
 
     Returns:
         What the build wrote.
@@ -128,8 +132,8 @@ def build(
         if config().brand is not None:  # a project with no brand has no mark to draw
             report.pages.extend(write_brand(output_dir))
 
-    render_sections(render, report, (pages,), papers_dir=papers_dir, posts_dir=posts_dir,
-                    pdfs=pdfs)  # fmt: skip
+    render_sections(render, report, (pages, *sections), papers_dir=papers_dir,
+                    posts_dir=posts_dir, pdfs=pdfs)  # fmt: skip
     write_site_files(output_dir, report.pages, common["site_url"])
     return report
 
@@ -144,11 +148,15 @@ def _version() -> str:
         return ""
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None, sections: Sequence[Section] = ()) -> None:
     """Build the site from the command line.
+
+    A project with sections of its own calls this from its own module, and points
+    ``BUILD_COMMAND`` in its Makefile at that module.
 
     Args:
         argv: The arguments, or None for the command line's.
+        sections: The project's own sections (:func:`build`).
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output-dir", type=Path, default=Path("dist"))
@@ -163,6 +171,7 @@ def main(argv: list[str] | None = None) -> None:
         args.papers if args.papers.is_dir() else None,
         args.posts if args.posts.is_dir() else None,
         args.pdfs,
+        sections,
     )
     print(f"Wrote {len(report.pages)} pages to {args.output_dir}")
 
