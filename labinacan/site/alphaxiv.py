@@ -1,4 +1,6 @@
-"""A paper's alphaXiv page, from its ``CITATION.cff`` (#5259).
+"""A paper's alphaXiv page, from its metadata file (#5259).
+
+The file is ``CITATION.cff`` by default, or the one that ``[tool.labinacan] paper_meta`` names.
 
 ``scripts/papers.py`` records the URL and checks it. The site links it only when it has
 the alphaXiv form, whatever the file says.
@@ -11,8 +13,10 @@ from pathlib import Path
 
 import yaml  # a dependency of transformers and huggingface_hub
 
+from labinacan.config import config
+
 # A published paper's page on the alphaXiv AI Track (#5259): a ``url`` identifier of its
-# CITATION.cff, with this description. The field is outside the paper's frozen hash.
+# metadata file, with this description. The field is outside the paper's frozen hash.
 ALPHAXIV = "alphaXiv AI Track"
 ALPHAXIV_URL = re.compile(r"https://www\.alphaxiv\.org/abs/[\w.\-]+(?:v\d+)?")
 
@@ -20,7 +24,7 @@ __all__ = ["ALPHAXIV", "ALPHAXIV_URL", "alphaxiv_url", "cited_alphaxiv"]
 
 
 def cited_alphaxiv(folder: Path) -> str | None:
-    r"""The ``url`` identifier that the paper's ``CITATION.cff`` gives for alphaXiv, unchecked.
+    r"""The ``url`` identifier that the paper's metadata file gives for alphaXiv, unchecked.
 
     ``scripts/papers.py check`` reads it to find a bad value. The site uses
     :func:`alphaxiv_url`, which links only a value of the alphaXiv form.
@@ -29,7 +33,7 @@ def cited_alphaxiv(folder: Path) -> str | None:
         folder: The paper's folder.
 
     Returns:
-        The value, or None when the paper has no citation file or no such identifier.
+        The value, or None when the paper has no metadata file or no such identifier.
 
     Examples:
         >>> import tempfile
@@ -42,7 +46,7 @@ def cited_alphaxiv(folder: Path) -> str | None:
         >>> cited_alphaxiv(folder)
         'javascript:alert(1)'
     """
-    path = folder / "CITATION.cff"
+    path = folder / config().paper_meta
     if not path.is_file():
         return None
     found = yaml.safe_load(path.read_text(encoding="utf-8")).get("identifiers") or []
@@ -51,7 +55,7 @@ def cited_alphaxiv(folder: Path) -> str | None:
 
 
 def alphaxiv_url(folder: Path) -> str | None:
-    r"""The paper's alphaXiv URL, from its ``CITATION.cff``, when it has the alphaXiv form.
+    r"""The paper's alphaXiv URL, from its metadata file, when it has the alphaXiv form.
 
     Args:
         folder: The paper's folder.

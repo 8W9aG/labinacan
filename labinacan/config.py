@@ -85,6 +85,9 @@ class ProjectConfig:
     maintainer: str  # the maintainer's GitHub login
     hf_dataset: str  # the Hugging Face dataset of the public inputs, as "owner/name"
     brand: Brand | None = None  # [tool.labinacan.brand], or None for a project with no brand
+    # Each paper's metadata file: its authors, status, frozen hash and alphaXiv URL. A
+    # project with no citation file per paper names "paper.yml".
+    paper_meta: str = "CITATION.cff"
 
     @property
     def repo(self) -> str:
@@ -170,6 +173,7 @@ def config() -> ProjectConfig:
                 maintainer=own["maintainer"],
                 hf_dataset=own["hf_dataset"],
                 brand=brand_of(own.get("brand")),
+                paper_meta=own.get("paper_meta", "CITATION.cff"),
             )
     raise LookupError(f"no [tool.labinacan] table in {', '.join(map(str, _PATHS))}")
 

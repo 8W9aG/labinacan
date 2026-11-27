@@ -20,6 +20,7 @@ import yaml  # a dependency of transformers and huggingface_hub
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from labinacan.config import config
 from labinacan.site.alphaxiv import (
     alphaxiv_url,
 )
@@ -158,10 +159,11 @@ class Paper:
     hero_alt: str = ""  # the first figure's alt text, for X and link cards (#5534)
     social_image: str | None = None  # media/social.png, drawn from the first figure (#5534)
     social_video: str | None = None  # media/social.mp4, when that figure animates
-    authors: tuple[str, ...] = ()  # from the folder's CITATION.cff, in order (#5260)
+    authors: tuple[str, ...] = ()  # from the folder's metadata file, in order (#5260)
     thread: tuple = ()  # its X thread (social.thread.Prepared), from thread.yaml (#5833)
     x_url: str | None = None  # its post on X, once posted (media/social.json, #5840)
-    alphaxiv_url: str | None = None  # its alphaXiv page, once uploaded (CITATION.cff, #5259)
+    alphaxiv_url: str | None = None  # its alphaXiv page, once uploaded (metadata file, #5259)
+    citation: str | None = None  # "CITATION.cff" when the folder has one: the "Cite" link
 
     @property
     def href(self) -> str:
@@ -221,7 +223,9 @@ def _first_image(tokens: list[Token]) -> tuple[str | None, str]:
 
 
 def cff_authors(folder: Path) -> tuple[str, ...]:
-    """The author names in ``folder/CITATION.cff``, in order, or none if it has no such file.
+    """The author names in the paper's metadata file, in order, or none if it has no such file.
+
+    The file is ``CITATION.cff``, or the one that ``[tool.labinacan] paper_meta`` names.
 
     A person is "given-names family-names", and a group is its ``name`` (#5260).
 
@@ -229,9 +233,9 @@ def cff_authors(folder: Path) -> tuple[str, ...]:
         folder: The paper's folder.
 
     Returns:
-        The names, or an empty tuple when the folder has no ``CITATION.cff``.
+        The names, or an empty tuple when the folder has no metadata file.
     """
-    path = folder / "CITATION.cff"
+    path = folder / config().paper_meta
     if not path.is_file():
         return ()
     people = yaml.safe_load(path.read_text(encoding="utf-8")).get("authors") or []
@@ -286,6 +290,7 @@ def _read_paper(folder: Path, repo_url: str, source: str = "papers") -> Paper:
         thread=_thread(folder, sections),
         x_url=x_url(folder),
         alphaxiv_url=alphaxiv_url(folder),
+        citation="CITATION.cff" if (folder / "CITATION.cff").is_file() else None,
     )
 
 
