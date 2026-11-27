@@ -18,14 +18,18 @@ def test_site_commands_give_deploy_the_projects_site_url():
     assert social is lab.social_group
 
 
-def _deploy(monkeypatch, tmp_path, env, urls):
+def _deploy(monkeypatch, tmp_path, env, urls, rclone=None, extra=()):
     """Run ``deploy`` with a stand-in for R2 and Cloudflare; return what each got."""
+    import shutil
+
     seen = {}
+    monkeypatch.setattr(shutil, "which", lambda name: rclone if name == "rclone" else None)
     monkeypatch.setattr(r2.R2Config, "from_env", classmethod(lambda cls: "config"))
     monkeypatch.setattr(r2, "make_client", lambda config: seen.update(client=config) or "client")
 
-    def sync(dist, bucket, client, *, prefix, delete, dry_run, log):
+    def sync(dist, bucket, client, *, prefix, delete, dry_run, log, uploader):
         seen["sync"] = (dist, bucket, client, prefix, delete, dry_run, log)
+        seen["uploader"] = uploader
         return SyncPlan(uploads=["p/a.html"])
 
     monkeypatch.setattr(r2, "sync_directory", sync)
@@ -40,7 +44,8 @@ def _deploy(monkeypatch, tmp_path, env, urls):
     monkeypatch.setattr(r2, "purge_targets", targets)
     monkeypatch.setattr(r2, "purge_cloudflare_cache", purge)
     group = click.Group(commands=lab.site_commands("LAB_URL", lambda: "https://x.org/"))
-    args = ["deploy", "--dist-dir", str(tmp_path), "--bucket", "b", "--prefix", "p/", "--delete"]
+    args = ["deploy", "--dist-dir", str(tmp_path), "--bucket", "b", "--prefix", "p/", "--delete",
+            *extra]  # fmt: skip
     result = CliRunner().invoke(group, args, env=env)
     return result, seen
 
@@ -54,6 +59,7 @@ def test_deploy_syncs_then_purges_the_changed_urls(monkeypatch, tmp_path):
     assert seen["targets"] == ("https://x.org/", "p/")
     assert seen["purge"] == ("z", "t", ["https://x.org/p/a.html"])
     assert result.output == (
+        "Uploading with boto3\n"
         "Uploaded 1, unchanged 0, deleted 0, derived skipped 0\n"
         "Purged 1 URLs from the Cloudflare cache\n"
     )
@@ -68,3 +74,20 @@ def test_deploy_purges_nothing_without_both_cloudflare_secrets(monkeypatch, tmp_
     for env in ({"CF_API_TOKEN": "t"}, {"CF_ZONE_ID": "z"}):
         result, seen = _deploy(monkeypatch, tmp_path, env, ["u"])
         assert result.exit_code == 0 and "targets" not in seen and "purge" not in seen
+
+
+def test_deploy_uploads_with_rclone_when_it_is_installed(monkeypatch, tmp_path):
+    monkeypatch.setattr(r2, "rclone_uploader", lambda config, path: ("rclone", config, path))
+    result, seen = _deploy(monkeypatch, tmp_path, {}, [], rclone="/bin/rclone")
+    assert result.exit_code == 0, result.output
+    assert seen["uploader"] == ("rclone", "config", "/bin/rclone")
+    assert result.output.startswith("Uploading with rclone\n")
+    result, seen = _deploy(monkeypatch, tmp_path, {}, [], rclone="/bin/rclone",
+                           extra=["--uploader", "boto"])  # fmt: skip
+    assert seen["uploader"] is None and result.output.startswith("Uploading with boto3\n")
+
+
+def test_deploy_refuses_rclone_when_it_is_not_installed(monkeypatch, tmp_path):
+    result, seen = _deploy(monkeypatch, tmp_path, {}, [], extra=["--uploader", "rclone"])
+    assert result.exit_code == 1 and "rclone is not installed" in result.output
+    assert "sync" not in seen

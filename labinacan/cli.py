@@ -137,7 +137,10 @@ def deploy_command(site_url_env: str, site_url: Callable[[], str | None]) -> cli
         help="Public URL of the bucket root (default: the project's site URL). With CF_ZONE_ID "
         "and CF_API_TOKEN set, the changed URLs are purged from Cloudflare's cache.",
     )
-    def deploy(dist_dir, bucket, prefix, delete, dry_run, site_url):
+    @click.option("--uploader", type=click.Choice(["auto", "rclone", "boto"]), default="auto",
+                  show_default=True,
+                  help="How to upload: rclone, boto3, or rclone when it is installed.")  # fmt: skip
+    def deploy(dist_dir, bucket, prefix, delete, dry_run, site_url, uploader):
         """Delta-sync the built site to Cloudflare R2 (a no-op when nothing changed).
 
         \f
@@ -148,13 +151,14 @@ def deploy_command(site_url_env: str, site_url: Callable[[], str | None]) -> cli
             delete: Delete remote objects that the site no longer has.
             dry_run: Show the changes, and upload nothing.
             site_url: The public URL of the bucket's root, for the cache purge.
+            uploader: ``rclone``, ``boto``, or ``auto`` for rclone when it is installed.
         """
-        _deploy(dist_dir, bucket, prefix, delete, dry_run, site_url)
+        _deploy(dist_dir, bucket, prefix, delete, dry_run, site_url, uploader)
 
     return deploy
 
 
-def _deploy(dist_dir, bucket, prefix, delete, dry_run, site_url) -> None:
+def _deploy(dist_dir, bucket, prefix, delete, dry_run, site_url, uploader="boto") -> None:
     """Sync ``dist_dir`` to the bucket, then purge the changed URLs from Cloudflare's cache.
 
     Args:
@@ -164,20 +168,29 @@ def _deploy(dist_dir, bucket, prefix, delete, dry_run, site_url) -> None:
         delete: Delete remote objects that the site no longer has.
         dry_run: Show the changes, and upload nothing.
         site_url: The public URL of the bucket's root, for the cache purge.
+        uploader: ``rclone``, ``boto``, or ``auto`` for rclone when it is installed.
     """
     import os
+    import shutil
 
     from labinacan.sync.r2 import (
         R2Config,
         make_client,
         purge_cloudflare_cache,
         purge_targets,
+        rclone_uploader,
         sync_directory,
     )
 
-    client = make_client(R2Config.from_env())
+    config = R2Config.from_env()
+    client = make_client(config)
+    rclone = shutil.which("rclone")
+    if uploader == "rclone" and rclone is None:
+        raise click.ClickException("--uploader rclone: rclone is not installed")
+    upload = rclone_uploader(config, rclone) if uploader != "boto" and rclone else None
+    click.echo(f"Uploading with {'rclone' if upload else 'boto3'}")
     plan = sync_directory(dist_dir, bucket, client, prefix=prefix, delete=delete,
-                          dry_run=dry_run, log=click.echo)  # fmt: skip
+                          dry_run=dry_run, log=click.echo, uploader=upload)  # fmt: skip
     verb = "Would upload" if dry_run else "Uploaded"
     click.echo(
         f"{verb} {len(plan.uploads)}, unchanged {len(plan.unchanged)}, "

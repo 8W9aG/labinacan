@@ -11,7 +11,10 @@ uploaded, deleted or purged.
   Pagefind index is not byte-stable across runs, so syncing it alone would churn.
 * Protected prefixes (``data/snapshots/``) are never deleted: snapshot URLs are
   permanent.
-* With a Cloudflare zone configured, only changed short-cache URLs are purged.
+* With a Cloudflare zone configured, only changed short-cache URLs are purged. Past
+  :data:`PURGE_ALL_ABOVE` of them, one request purges the whole zone instead.
+* Uploads go through boto3, or through rclone when it is installed
+  (:func:`rclone_uploader`). rclone moves many small files faster.
 
 Credentials come from ``CF_ACCOUNT_ID``, ``R2_ACCESS_KEY_ID`` and
 ``R2_SECRET_ACCESS_KEY``; purging uses ``CF_ZONE_ID`` and ``CF_API_TOKEN``.
@@ -24,6 +27,8 @@ import json
 import mimetypes
 import os
 import re
+import subprocess
+import tempfile
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -38,6 +43,9 @@ IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
 DERIVED_PREFIXES = ("pagefind/",)
 PROTECTED_PREFIXES = ("data/snapshots/",)
 PURGE_BATCH = 30  # Cloudflare's per-request limit for purge-by-URL
+# Past this many URLs, one purge of the whole zone replaces the batches: a change to every
+# page would need thousands of requests, and Cloudflare limits how fast they may come.
+PURGE_ALL_ABOVE = 3000
 
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -122,6 +130,8 @@ def make_client(config: R2Config) -> Any:
         config=Config(
             read_timeout=READ_TIMEOUT_S,
             retries={"mode": "standard", "total_max_attempts": MAX_ATTEMPTS},
+            # botocore keeps 10 connections by default, so most upload threads would wait.
+            max_pool_connections=max(10, UPLOAD_WORKERS),
         ),
     )
 
@@ -202,7 +212,7 @@ def plan_sync(
     return plan
 
 
-UPLOAD_WORKERS = int(os.environ.get(env("UPLOAD_WORKERS"), "32"))
+UPLOAD_WORKERS = int(os.environ.get(env("UPLOAD_WORKERS"), "64"))
 """Uploads in flight at once (``$<prefix>_UPLOAD_WORKERS``, :func:`labinacan.config.env`)."""
 
 
@@ -232,6 +242,67 @@ def _upload(client, bucket: str, local: Mapping[str, Path], keys: Sequence[str],
             list(pool.map(put, group))  # waits for the group, and raises its first error
 
 
+def rclone_uploader(
+    config: R2Config, rclone: str = "rclone", run: Callable[..., Any] = subprocess.run
+) -> Callable[..., None]:
+    """An uploader for :func:`sync_directory` that copies the files with rclone.
+
+    The files go in :func:`_upload_order`'s groups, so every asset lands before the first
+    page. Within a group, one rclone run copies the files that share a Cache-Control and a
+    Content-Type. Each file goes up in one part, so its ETag stays its MD5, as
+    :func:`plan_sync` compares. The credentials reach rclone in its environment, never on
+    its command line.
+
+    Args:
+        config: The R2 account and credentials.
+        rclone: The rclone program.
+        run: Runs a command (a parameter so that tests can replace it).
+
+    Returns:
+        The uploader.
+    """
+    from itertools import groupby
+
+    secrets = {
+        "RCLONE_S3_PROVIDER": "Cloudflare",
+        "RCLONE_S3_ENDPOINT": config.endpoint_url,
+        "RCLONE_S3_ACCESS_KEY_ID": config.access_key_id,
+        "RCLONE_S3_SECRET_ACCESS_KEY": config.secret_access_key,
+    }
+
+    def upload(
+        dist_dir: Path,
+        bucket: str,
+        _local: Mapping[str, Path],  # the boto uploader's argument; rclone reads dist_dir
+ keys: Sequence[str],
+               prefix: str) -> None:  # fmt: skip
+        def headers(key: str) -> tuple[int, str, str]:
+            rel = key.removeprefix(prefix)
+            return _upload_order(rel)[0], cache_control_for(rel), content_type_for(rel)
+
+        dest = f":s3:{bucket}/{prefix}".rstrip("/")
+        for (_, cache, kind), group in groupby(sorted(keys, key=headers), key=headers):
+            paths = [key.removeprefix(prefix) for key in group]
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as listing:
+                listing.write("\n".join(paths) + "\n")
+            try:
+                done = run(
+                    [rclone, "copy", str(dist_dir), dest, "--files-from-raw", listing.name,
+                     "--no-check-dest", "--s3-no-check-bucket", "--s3-upload-cutoff", "5Gi",
+                     "--transfers", str(UPLOAD_WORKERS), "--checkers", str(UPLOAD_WORKERS),
+                     "--retries", str(MAX_ATTEMPTS), "--header-upload", f"Cache-Control: {cache}",
+                     "--header-upload", f"Content-Type: {kind}"],
+                    env={**os.environ, **secrets},
+                    check=False,
+                )  # fmt: skip
+            finally:
+                os.unlink(listing.name)
+            if done.returncode != 0:
+                raise SyncError(f"rclone could not upload {len(paths)} files ({kind}, {cache})")
+
+    return upload
+
+
 def sync_directory(
     dist_dir: Path,
     bucket: str,
@@ -241,8 +312,13 @@ def sync_directory(
     delete: bool = False,
     dry_run: bool = False,
     log: Callable[[str], None] = lambda _msg: None,
+    uploader: Callable[..., None] | None = None,
 ) -> SyncPlan:
-    """Sync ``dist_dir`` to ``bucket``; with ``dry_run``, only log what would change."""
+    """Sync ``dist_dir`` to ``bucket``; with ``dry_run``, only log what would change.
+
+    ``uploader(dist_dir, bucket, local, keys, prefix)`` uploads the changed files, for
+    example :func:`rclone_uploader`'s. By default, ``client`` uploads them.
+    """
     dist_dir = Path(dist_dir)
     if not dist_dir.is_dir():
         raise SyncError(f"{dist_dir} is not a directory; build the site first")
@@ -256,7 +332,9 @@ def sync_directory(
             log(f"skip    {key}  (derived; no source file changed)")
         for key in plan.uploads:
             log(f"upload  {key}  [{cache_control_for(key.removeprefix(prefix))}]")
-        if not dry_run:
+        if not dry_run and uploader is not None:
+            uploader(dist_dir, bucket, local, plan.uploads, prefix)
+        elif not dry_run:
             _upload(client, bucket, local, plan.uploads, prefix)
         for start in range(0, len(plan.deletes), 1000):  # DeleteObjects takes <= 1000 keys
             batch = plan.deletes[start : start + 1000]
@@ -298,11 +376,20 @@ def purge_cloudflare_cache(
     *,
     opener: Callable[..., Any] = urllib.request.urlopen,  # noqa: S310  (Cloudflare's https API)
 ) -> None:
-    """Purge ``urls`` from Cloudflare's edge cache (no-op for an empty list)."""
-    for start in range(0, len(urls), PURGE_BATCH):
+    """Purge ``urls`` from Cloudflare's edge cache (no-op for an empty list).
+
+    Past :data:`PURGE_ALL_ABOVE` URLs, one request purges the whole zone.
+    """
+    if len(urls) > PURGE_ALL_ABOVE:
+        payloads = [{"purge_everything": True}]
+    else:
+        payloads = [
+            {"files": list(urls[i : i + PURGE_BATCH])} for i in range(0, len(urls), PURGE_BATCH)
+        ]
+    for payload in payloads:
         request = urllib.request.Request(
             f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache",
-            data=json.dumps({"files": list(urls[start : start + PURGE_BATCH])}).encode(),
+            data=json.dumps(payload).encode(),
             headers={"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"},
             method="POST",
         )

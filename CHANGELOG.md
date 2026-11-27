@@ -4,6 +4,14 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-27
+
+### Changed
+
+- `deploy` uploads with rclone when it is installed (`--uploader auto`, the default), or with boto3 (`--uploader boto`). rclone copies the files in the same groups, assets before pages, with each group's Cache-Control and Content-Type. Each file goes up in one part, so its ETag stays its MD5. The credentials reach rclone in its environment, not on its command line.
+- The boto3 client keeps one connection for each upload thread, and the default is 64 threads. Before, botocore's pool of 10 connections held most of the 32 threads back.
+- A change of more than 3,000 short-cache URLs purges the whole Cloudflare zone in one request, in place of thousands of 30-URL requests.
+
 ## [0.1.3] - 2026-11-27
 
 ### Fixed
