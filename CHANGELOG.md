@@ -4,6 +4,16 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-27
+
+### Added
+
+- `[tool.labinacan] paper_meta` names each paper's metadata file, such as `"paper.yml"` for a project with no citation file per paper. The default is `"CITATION.cff"`. The site reads a paper's authors and its alphaXiv URL from that file.
+
+### Fixed
+
+- A paper's page links "Cite" only when the paper's folder has a `CITATION.cff`. Before, the link pointed at the file whether or not it existed.
+
 ## [0.1.4] - 2026-11-27
 
 ### Changed

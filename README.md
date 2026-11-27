@@ -42,6 +42,8 @@ maintainer = "someone"
 hf_dataset = "someone/a-project-inputs"
 ```
 
+An optional `paper_meta` names each paper's metadata file, which holds its authors and its alphaXiv URL. The default is `"CITATION.cff"`. A project with no citation file per paper gives `"paper.yml"`.
+
 `labinacan.config` reads these values. `tests/example/pyproject.toml` is a full example, with a brand.
 
 ## Develop
