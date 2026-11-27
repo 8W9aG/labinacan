@@ -4,6 +4,12 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-27
+
+### Fixed
+
+- A site with more pages than one sitemap holds (50,000) builds again. `sitemap.xml` becomes a sitemap index, and `sitemap-1.xml`, `sitemap-2.xml` and so on hold the pages. Before, the build stopped with an error. A site at or under the limit keeps one `sitemap.xml`, byte for byte as before. A build removes the parts that a larger build left.
+
 ### Added
 
 - CI checks that no word of another project is left in the package (`scripts/check_leftovers.py`, with the template's list of words). The baseline is empty.
