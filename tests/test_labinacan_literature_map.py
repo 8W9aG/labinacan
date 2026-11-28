@@ -177,7 +177,7 @@ def test_main_embeds_the_reviews_and_the_queue_and_writes_the_map(monkeypatch, t
     assert seen["texts"] == [map_text(folder / "a.md"), map_text(folder / "b.md"), queue[0]["text"]]
     assert [r["name"] for r in data["reviews"]] == ["a", "b"]
     assert data["reviews"][0]["sha256"] == hashlib.sha256(seen["texts"][0].encode()).hexdigest()
-    assert data["reviews"][0]["neighbours"] == ["b", "a"]
+    assert data["reviews"][0]["neighbours"] == ["b"]  # never the review itself
     assert data["queued"] == [{"number": 7, "title": "A queued paper", "x": 0.5, "y": 0.5,
                                "region": 1}]  # fmt: skip
     assert (data["layout"], data["regions"]) == ("umap seed 4577", rows)
@@ -199,3 +199,13 @@ def test_the_real_layout_names_each_region_after_a_section(monkeypatch, tmp_path
     assert seed == 1 and len(region_of) == 20 and 0 <= compact <= 1
     assert all(not r["name"].startswith("Region ") for r in rows)
     assert {r["number"] for r in rows} == set(region_of)
+
+
+def test_one_review_sits_in_the_middle_with_no_neighbours():
+    """A project with one review gets a map that is JSON: no NaN, and no self-neighbour."""
+    assert lm.scaled(np.array([[3.0, -2.0]])).tolist() == [[0.5, 0.5]]
+    assert lm.scaled(np.array([[0.0, 5.0], [2.0, 5.0], [1.0, 5.0]])).tolist() == [
+        [0.0, 0.5], [1.0, 0.5], [0.5, 0.5]]  # fmt: skip
+    assert lm.neighbours(np.eye(1), ["a"]) == [[]]
+    vectors = np.array([[1.0, 0.0], [0.8, 0.6], [0.0, 1.0], [0.6, 0.8], [-1.0, 0.0]])
+    assert lm.neighbours(vectors, list("abcde"))[0] == ["b", "d", "c"]
