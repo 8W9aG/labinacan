@@ -4,6 +4,14 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-27
+
+### Added
+
+- `labinacan.literature_map` writes `docs/literature/map.json`, the layout that the site's literature index draws. A project runs `python -m labinacan.literature_map`, or `literature-map` on its own CLI (`site_commands` now mounts it), in its root, with the new `map` extra (sentence-transformers, umap-learn, leidenalg and igraph). The package imports without the extra. Before, each project kept its own copy of the script.
+- `[tool.labinacan] literature_repo` and `literature_label` name the GitHub repository and the label of the open issues that the map shows as queued papers. The defaults are the project's `Repository` URL and `"area: literature"`. With `literature_repo = ""`, or without `gh`, the map has no queued papers.
+- `labinacan.literature_map.missing_from_map(root)` gives the reviews in a project's `docs/literature/` that its `map.json` does not place, or places from older text. A project's test asserts that it is empty.
+
 ## [0.1.6] - 2026-11-27
 
 ### Added

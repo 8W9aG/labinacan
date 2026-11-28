@@ -1,9 +1,10 @@
-"""The commands that any project's site needs: ``deploy`` and ``social`` (#6628).
+"""The commands that any project's site needs: ``deploy``, ``social`` and ``literature-map``.
 
 A project mounts them on its own CLI (:func:`site_commands`). ``deploy`` syncs the built site
 to Cloudflare R2. ``social post`` reads the site's feeds of published papers and site
 posts, and posts each new entry once (``labinacan/social``). The deploy workflow runs it
 after each sync, with the X secrets. Without them it posts nothing and exits cleanly.
+``literature-map`` writes ``docs/literature/map.json`` (:mod:`labinacan.literature_map`).
 """
 
 from __future__ import annotations
@@ -209,8 +210,28 @@ def _deploy(dist_dir, bucket, prefix, delete, dry_run, site_url, uploader="boto"
         click.echo(f"Purged {len(urls)} URLs from the Cloudflare cache")
 
 
+@click.command(name="literature-map")
+def literature_map_command() -> None:
+    """Lay the literature reviews out on a map, and write docs/literature/map.json.
+
+    Run it in the project's root, with labinacan's ``map`` extra installed.
+
+    \f
+    Raises:
+        click.ClickException: When the ``map`` extra is not installed.
+    """
+    from labinacan import literature_map
+
+    try:
+        literature_map.main()
+    except ImportError as error:  # a library of the map extra
+        raise click.ClickException(
+            f'{error}. Install labinacan\'s map extra: uv run --with "labinacan[map]" ...'
+        ) from error
+
+
 def site_commands(site_url_env: str, site_url: Callable[[], str | None]) -> list[click.Command]:
-    """The commands to mount on a project's CLI: ``deploy`` and the ``social`` group.
+    """The commands to mount on a project's CLI: ``deploy``, ``social`` and ``literature-map``.
 
     Args:
         site_url_env: The environment variable that sets the site's URL.
@@ -221,6 +242,6 @@ def site_commands(site_url_env: str, site_url: Callable[[], str | None]) -> list
 
     Examples:
         >>> [c.name for c in site_commands("LAB_SITE_URL", lambda: None)]
-        ['deploy', 'social']
+        ['deploy', 'social', 'literature-map']
     """
-    return [deploy_command(site_url_env, site_url), social_group]
+    return [deploy_command(site_url_env, site_url), social_group, literature_map_command]

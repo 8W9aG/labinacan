@@ -7,7 +7,7 @@ the regions. Callout cards in the margins name the most-cited papers that the re
 with leader lines to their dots (:func:`callouts`, #5798). Every other paper shows its card
 on hover or focus.
 
-``scripts/literature_map.py`` lays the papers out offline and writes ``map.json``. This
+:mod:`labinacan.literature_map` lays the papers out offline and writes ``map.json``. This
 module only places them. A review's status is its shape (circle, triangle, square), so
 colour never carries it alone. Regions are told apart by their numbers and names too.
 """
