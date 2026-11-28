@@ -4,6 +4,12 @@ All notable changes to labinacan are listed here, newest first. The format follo
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-27
+
+### Fixed
+
+- `labinacan.literature_map` gives a project with one review a valid map. The review sits at 0.5 on each axis, where before its coordinates were NaN, which is not JSON. A review is never its own neighbour, where before a map with no more reviews than `NEIGHBOURS` listed each review among its neighbours.
+
 ## [0.1.7] - 2026-11-27
 
 ### Added

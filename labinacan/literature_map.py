@@ -71,11 +71,23 @@ def layout(vectors, seed: int):
     Returns:
         The points.
     """
+    import numpy as np
     import umap
 
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.08, metric="cosine", random_state=seed)
-    points = reducer.fit_transform(vectors)
-    return (points - points.min(0)) / (points.max(0) - points.min(0))
+    return scaled(np.asarray(reducer.fit_transform(vectors)))
+
+
+def scaled(points):
+    """The points scaled to 0 to 1 on each axis. An axis with one value puts every point at 0.5.
+
+    A project with one review has one point, so each axis has one value. Without the 0.5,
+    its coordinates would be NaN, and ``map.json`` would not be JSON.
+    """
+    import numpy as np
+
+    low, span = points.min(0), points.max(0) - points.min(0)
+    return np.where(span > 0, (points - low) / np.where(span > 0, span, 1), 0.5)
 
 
 def knn_edges(vectors) -> dict[tuple[int, int], float]:
@@ -407,8 +419,8 @@ def neighbours(vectors, names: list[str]) -> list[list[str]]:
     import numpy as np
 
     similar = vectors @ vectors.T
-    np.fill_diagonal(similar, -1)
-    return [[names[j] for j in np.argsort(-row)[:NEIGHBOURS]] for row in similar]
+    order = np.argsort(-similar, axis=1, kind="stable")
+    return [[names[j] for j in row if j != i][:NEIGHBOURS] for i, row in enumerate(order)]
 
 
 def arrange(vectors, names: list[str], reviewed: int, seed: int) -> tuple:
